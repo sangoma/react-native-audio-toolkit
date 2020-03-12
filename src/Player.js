@@ -1,9 +1,14 @@
 import { NativeModules, DeviceEventEmitter, NativeAppEventEmitter, Platform } from 'react-native';
 
-import _ from 'lodash';
 import async from 'async';
 import EventEmitter from 'eventemitter3';
 import MediaStates from './MediaStates';
+
+// Only import specific items from lodash to keep build size down
+import filter from 'lodash/filter';
+import identity from 'lodash/identity';
+import last from 'lodash/last';
+import noop from 'lodash/noop';
 
 const RCTAudioPlayer = NativeModules.AudioPlayer;
 
@@ -23,7 +28,18 @@ class Player extends EventEmitter {
     super();
 
     this._path = path;
-    this._options = options;
+
+    if (options == null) {
+      this._options = defaultPlayerOptions;
+    } else {
+      // Make sure all required options have values
+      if (options.autoDestroy == null)
+        options.autoDestroy = defaultPlayerOptions.autoDestroy;
+      if (options.continuesToPlayInBackground == null)
+        options.continuesToPlayInBackground = defaultPlayerOptions.continuesToPlayInBackground;
+
+      this._options = options;
+    }
 
     this._playerId = playerId++;
     this._reset();
@@ -39,6 +55,7 @@ class Player extends EventEmitter {
     this._state = MediaStates.IDLE;
     this._volume = 1.0;
     this._pan = 0.0;
+    this._speed = 1.0;
     this._wakeLock = false;
     this._duration = -1;
     this._position = -1;
@@ -64,7 +81,7 @@ class Player extends EventEmitter {
     }
 
     // Use last truthy value from results array as new media info
-    const info = _.last(_.filter(results, _.identity));
+    const info = last(filter(results, identity));
     this._storeInfo(info);
   }
 
@@ -101,7 +118,7 @@ class Player extends EventEmitter {
     this.emit(event, data);
   }
 
-  prepare(callback = _.noop) {
+  prepare(callback = noop) {
     this._updateState(null, MediaStates.PREPARING);
 
     const tasks = [];
@@ -120,6 +137,7 @@ class Player extends EventEmitter {
           pan: this._pan,
           wakeLock: this._wakeLock,
           looping: this._looping,
+          speed: this._speed,
         },
         next,
       );
@@ -133,7 +151,7 @@ class Player extends EventEmitter {
     return this;
   }
 
-  play(callback = _.noop) {
+  play(callback = noop) {
     const tasks = [];
 
     // Make sure player is prepared
@@ -156,7 +174,7 @@ class Player extends EventEmitter {
     return this;
   }
 
-  pause(callback = _.noop) {
+  pause(callback = noop) {
     RCTAudioPlayer.pause(this._playerId, (err, results) => {
       // Android emits a pause event on the native side
       if (Platform.OS === 'ios') {
@@ -168,7 +186,7 @@ class Player extends EventEmitter {
     return this;
   }
 
-  playPause(callback = _.noop) {
+  playPause(callback = noop) {
     if (this._state === MediaStates.PLAYING) {
       this.pause((err) => {
         callback(err, true);
@@ -182,7 +200,7 @@ class Player extends EventEmitter {
     return this;
   }
 
-  stop(callback = _.noop) {
+  stop(callback = noop) {
     RCTAudioPlayer.stop(this._playerId, (err, results) => {
       this._updateState(err, MediaStates.PREPARED);
       this._position = -1;
@@ -192,12 +210,12 @@ class Player extends EventEmitter {
     return this;
   }
 
-  destroy(callback = _.noop) {
+  destroy(callback = noop) {
     this._reset();
     RCTAudioPlayer.destroy(this._playerId, callback);
   }
 
-  seek(position = 0, callback = _.noop) {
+  seek(position = 0, callback = noop) {
     // Store old state, but not if it was already SEEKING
     if (this._state != MediaStates.SEEKING) {
       this._preSeekState = this._state;
@@ -215,7 +233,7 @@ class Player extends EventEmitter {
     });
   }
 
-  _setIfInitialized(options, callback = _.noop) {
+  _setIfInitialized(options, callback = noop) {
     if (this._state >= MediaStates.PREPARED) {
       RCTAudioPlayer.set(this._playerId, options, callback);
     }
@@ -240,19 +258,28 @@ class Player extends EventEmitter {
     this._setIfInitialized({ looping: value });
   }
 
+  set speed(value) {
+    this._speed = value;
+    this._setIfInitialized({ speed: value });
+  }
+
   get currentTime() {
-    let pos = -1;
+    // Queue up an async call to get an accurate current time
+    RCTAudioPlayer.getCurrentTime(this._playerId, (err, results) => {
+      this._storeInfo(results);
+    });
 
     if (this._position < 0) {
       return -1;
     }
 
     if (this._state === MediaStates.PLAYING) {
-      pos = this._position + (Date.now() - this._lastSync);
+      // Estimate the current time based on the latest info we received
+      let pos = this._position + (Date.now() - this._lastSync) * this._speed;
       pos = Math.min(pos, this._duration);
-
       return pos;
     }
+
     return this._position;
   }
 
@@ -264,6 +291,9 @@ class Player extends EventEmitter {
   }
   get duration() {
     return this._duration;
+  }
+  get speed() {
+    return this._speed;
   }
 
   get state() {

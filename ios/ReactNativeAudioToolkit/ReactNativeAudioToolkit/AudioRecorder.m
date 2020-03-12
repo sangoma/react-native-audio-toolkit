@@ -3,7 +3,8 @@
 //  ReactNativeAudioToolkit
 //
 //  Created by Oskar Vuola on 28/06/16.
-//  Copyright (c) 2016 Futurice.
+//  Copyright (c) 2016-2019 Futurice.
+//  Copyright (c) 2019+ React Native Community.
 //
 //  Licensed under the MIT license. For more information, see LICENSE.
 
@@ -77,7 +78,7 @@ RCT_EXPORT_METHOD(prepare:(nonnull NSNumber *)recorderId
     // Initialize audio session
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
     NSError *error = nil;
-    [audioSession setCategory:AVAudioSessionCategoryRecord error:&error];
+    [audioSession setCategory:AVAudioSessionCategoryRecord withOptions:AVAudioSessionCategoryOptionAllowBluetooth error:&error];
     if (error) {
         NSDictionary* dict = [Helpers errObjWithCode:@"preparefail" withMessage:@"Failed to set audio session category"];
         callback(@[dict]);

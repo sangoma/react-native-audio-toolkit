@@ -1,6 +1,9 @@
 react-native-audio-toolkit API
 ==============================
 
+<!-- IMPORTANT: If you change anything in this file, make sure to also update:
+                react-native-audio-toolkit/typings/index.d.ts -->
+
 Media methods
 -------------
 
@@ -61,8 +64,8 @@ Media methods
     Helper method for toggling pause.
 
     Callback is called after the operation has finished. Callback receives
-    `Object error` as first argument, `Boolean playing` as second argument
-    indicating if the player ended up playing (true) or paused (false).
+    `Object error` as first argument, `Boolean paused` as second argument
+    indicating if the player ended up playing (false) or paused (true).
 
 
 * `stop(Function ?callback)`
@@ -117,6 +120,11 @@ p.prepare((err) => {
     Get/set playback volume.
     The scale is from 0.0 (silence) to 1.0 (full volume).
 
+* `speed` - Number, default `1.0`
+
+    Get/set the playback speed for audio.
+    NOTE: On Android, this is only supported on Android 6.0+.
+
 * `duration` - Number (**read only**)
 
     Get duration of prepared/playing media in milliseconds. If no duration is
@@ -153,7 +161,7 @@ p.prepare((err) => {
     ```
 
     NOTE: This object is available as
-    `require('react-native-audio-toolkit').MediaStates`
+    `require('@react-native-community/audio-toolkit').MediaStates`
 
 * Helpers for states - Boolean (**read only**)
 
@@ -263,7 +271,7 @@ Player.isPrepared   true if player is prepared
     ```
 
     NOTE: This object is available as
-    `require('react-native-audio-toolkit').MediaStates`
+    `require('@react-native-community/audio-toolkit').MediaStates`
 
 * `fsPath` - String (**read only**)
 
@@ -331,5 +339,10 @@ The following $errorStrings might occur:
 ### Player-specific error callbacks:
 ```
 'seekfail' - new seek operation before the old one completed.
+```
+
+### Recorder-specific error callbacks:
+```
+'notsupported' - Device doesn't support the operation (Currently used for pause recording functionality on Android SDK < 24)
 ```
 
